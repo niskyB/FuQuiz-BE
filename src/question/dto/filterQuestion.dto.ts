@@ -29,7 +29,7 @@ export class FilterQuestionDTO {
 }
 
 export const vFilterQuestionDTO = joi.object<FilterQuestionDTO>({
-    content: questionValidateSchema.content.failover(''),
+    content: joi.string().required().failover(''),
     subject: joi.string().required().failover(''),
     lesson: joi.string().required().failover(''),
     dimension: joi.string().required().failover(''),
