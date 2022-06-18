@@ -1,4 +1,3 @@
-import { questionValidateSchema } from './../../core/models';
 import { ApiProperty } from '@nestjs/swagger';
 import * as joi from 'joi';
 
