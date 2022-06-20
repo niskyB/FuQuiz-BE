@@ -1,10 +1,12 @@
 import { SliderRepository } from './../core/repositories';
 import { Slider } from './../core/models';
 import { Injectable } from '@nestjs/common';
+import { Brackets } from 'typeorm';
+import { FilterService } from '../core/providers/filter/filter.service';
 
 @Injectable()
 export class SliderService {
-    constructor(private readonly sliderRepository: SliderRepository) {}
+    constructor(private readonly sliderRepository: SliderRepository, private readonly filterService: FilterService) {}
 
     async saveSlider(slider: Slider): Promise<Slider> {
         return await this.sliderRepository.save(slider);
@@ -19,8 +21,9 @@ export class SliderService {
             .getOne();
     }
 
-    async filterSliders(title: string, userId: string, createdAt: string, currentPage: number, pageSize: number, isShow: boolean): Promise<{ data: Slider[]; count: number }> {
+    async filterSliders(title: string, backLink: string, userId: string, createdAt: string, currentPage: number, pageSize: number, isShow: boolean): Promise<{ data: Slider[]; count: number }> {
         try {
+            const isShowValue = this.filterService.getMinMaxValue(isShow);
             const date = new Date(createdAt);
             let sliders, count;
             if (userId) {
@@ -29,8 +32,15 @@ export class SliderService {
                     .where(`slider.title LIKE (:title)`, {
                         title: `%${title}%`,
                     })
+                    .andWhere(`slider.backLink LIKE (:backLink)`, { backLink: `%${backLink}%` })
                     .andWhere(`slider.createdAt >= (:createdAt)`, { createdAt: date })
-                    .andWhere(`slider.isShow = (:isShow)`, { isShow: isShow })
+                    .andWhere(
+                        new Brackets((qb) => {
+                            qb.where('slider.isShow = :isShowMinValue', {
+                                isShowMinValue: isShowValue.minValue,
+                            }).orWhere('slider.isShow = :isShowMaxValue', { isShowMaxValue: isShowValue.maxValue });
+                        }),
+                    )
                     .leftJoinAndSelect('slider.marketing', 'marketing')
                     .leftJoinAndSelect('marketing.user', 'user')
                     .andWhere('user.id LIKE (:userId)', { userId: `%${userId}%` })
@@ -44,8 +54,15 @@ export class SliderService {
                     .where(`slider.title LIKE (:title)`, {
                         title: `%${title}%`,
                     })
+                    .andWhere(`slider.backLink LIKE (:backLink)`, { backLink: `%${backLink}%` })
                     .andWhere(`slider.createdAt >= (:createdAt)`, { createdAt: date })
-                    .andWhere(`slider.isShow = (:isShow)`, { isShow: isShow })
+                    .andWhere(
+                        new Brackets((qb) => {
+                            qb.where('slider.isShow = :isShowMinValue', {
+                                isShowMinValue: isShowValue.minValue,
+                            }).orWhere('slider.isShow = :isShowMaxValue', { isShowMaxValue: isShowValue.maxValue });
+                        }),
+                    )
                     .leftJoinAndSelect('slider.marketing', 'marketing')
                     .leftJoinAndSelect('marketing.user', 'user')
                     .andWhere('user.id LIKE (:userId)', { userId: `%${userId}%` })
@@ -56,8 +73,17 @@ export class SliderService {
                     .where(`slider.title LIKE (:title)`, {
                         title: `%${title}%`,
                     })
+                    .andWhere(`slider.backLink LIKE (:backLink)`, { backLink: `%${backLink}%` })
                     .andWhere(`slider.createdAt >= (:createdAt)`, { createdAt: date })
-                    .andWhere(`slider.isShow = (:isShow)`, { isShow: isShow })
+                    .andWhere(
+                        new Brackets((qb) => {
+                            qb.where('slider.isShow = :isShowMinValue', {
+                                isShowMinValue: isShowValue.minValue,
+                            }).orWhere('slider.isShow = :isShowMaxValue', { isShowMaxValue: isShowValue.maxValue });
+                        }),
+                    )
+                    .leftJoinAndSelect('slider.marketing', 'marketing')
+                    .leftJoinAndSelect('marketing.user', 'user')
                     .orderBy(`slider.createdAt`, 'DESC')
                     .skip(currentPage * pageSize)
                     .take(pageSize)
@@ -68,8 +94,17 @@ export class SliderService {
                     .where(`slider.title LIKE (:title)`, {
                         title: `%${title}%`,
                     })
+                    .andWhere(`slider.backLink LIKE (:backLink)`, { backLink: `%${backLink}%` })
                     .andWhere(`slider.createdAt >= (:createdAt)`, { createdAt: date })
-                    .andWhere(`slider.isShow = (:isShow)`, { isShow: isShow })
+                    .andWhere(
+                        new Brackets((qb) => {
+                            qb.where('slider.isShow = :isShowMinValue', {
+                                isShowMinValue: isShowValue.minValue,
+                            }).orWhere('slider.isShow = :isShowMaxValue', { isShowMaxValue: isShowValue.maxValue });
+                        }),
+                    )
+                    .leftJoinAndSelect('slider.marketing', 'marketing')
+                    .leftJoinAndSelect('marketing.user', 'user')
                     .getCount();
             }
 
