@@ -1,3 +1,4 @@
+import { AttendedQuestionService } from './../attended-question/attended-question.service';
 import { QuizDetailService } from './../quiz-detail/quiz-detail.service';
 import { QuestionService } from './../question/question.service';
 import { ExamLevelService } from './../exam-level/exam-level.service';
@@ -6,7 +7,7 @@ import { SubjectService } from '../subject/subject.service';
 import { ResponseMessage } from './../core/interface';
 import { JoiValidatorPipe } from './../core/pipe';
 import { ExpertGuard } from './../auth/guard';
-import { Body, Controller, Post, Req, Res, UseGuards, UsePipes, HttpException, Put, Param } from '@nestjs/common';
+import { Body, Controller, Post, Req, Res, UseGuards, UsePipes, HttpException, Put, Param, Delete, Get } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
@@ -16,7 +17,6 @@ import { Quiz, QuizDetail, UserRole } from '../core/models';
 
 @ApiTags('quiz')
 @ApiBearerAuth()
-@UseGuards(ExpertGuard)
 @Controller('quiz')
 export class QuizController {
     constructor(
@@ -26,9 +26,29 @@ export class QuizController {
         private readonly examLevelService: ExamLevelService,
         private readonly questionService: QuestionService,
         private readonly quizDetailService: QuizDetailService,
+        private readonly attendedQuestionService: AttendedQuestionService,
     ) {}
 
+    @Get('/:id')
+    @ApiParam({ name: 'id', example: 'TVgJIjsRFmIvyjUeBOLv4gOD3eQZY' })
+    async cGetQuiz(@Res() res: Response, @Param('id') id: string) {
+        const quiz = await this.quizService.getQuizByField('id', id);
+        quiz.questions = [];
+        const quizDetail = await this.quizDetailService.getQuizDetailsByQuizId(id);
+
+        for (const item of quizDetail) {
+            quiz.questions.push(item.question);
+        }
+
+        if (quiz.subject.assignTo) {
+            quiz.subject.assignTo.user.password = '';
+            quiz.subject.assignTo.user.token = '';
+        }
+        return res.send(quiz);
+    }
+
     @Post('')
+    @UseGuards(ExpertGuard)
     @UsePipes(new JoiValidatorPipe(vCreateQuizDTO))
     async cCreateQuiz(@Req() req: Request, @Res() res: Response, @Body() body: CreateQuizDTO) {
         const user = req.user;
@@ -75,15 +95,71 @@ export class QuizController {
 
     @Put('/:id')
     @ApiParam({ name: 'id', example: 'TVgJIjsRFmIvyjUeBOLv4gOD3eQZY' })
+    @UseGuards(ExpertGuard)
     @UsePipes(new JoiValidatorPipe(vUpdateQuizDTO))
     async cUpdateQuiz(@Req() req: Request, @Res() res: Response, @Body() body: UpdateQuizDTO, @Param('id') id: string) {
         const user = req.user;
+
+        const attendedQuestion = await this.attendedQuestionService.getAttendedQuestionByQuizId(id);
+        if (attendedQuestion) throw new HttpException({ errorMessage: ResponseMessage.QUIZ_TAKEN }, StatusCodes.BAD_REQUEST);
 
         const subject = await this.subjectService.getSubjectByField('id', body.subject);
         if (subject && user.role.description !== UserRole.ADMIN && subject.assignTo.id !== user.typeId) throw new HttpException({ errorMessage: ResponseMessage.FORBIDDEN }, StatusCodes.FORBIDDEN);
 
         const quiz = await this.quizService.getQuizByField('id', id);
+        body.numberOfQuestion = body.numberOfQuestion > 0 ? body.numberOfQuestion : quiz.numberOfQuestion;
+
+        if (body.questions.length === 0) {
+            if (body.numberOfQuestion !== quiz.questions.length) throw new HttpException({ questions: ResponseMessage.INVALID_NUMBER_OF_QUESTION }, StatusCodes.BAD_REQUEST);
+        } else {
+            if (body.numberOfQuestion !== body.questions.length) throw new HttpException({ questions: ResponseMessage.INVALID_NUMBER_OF_QUESTION }, StatusCodes.BAD_REQUEST);
+            for (const item of body.questions) {
+                const question = await this.questionService.getQuestionByField('id', item);
+                let quizDetail = await this.quizDetailService.getQuizDetailByQuizIdAndQuestionId(quiz.id, question.id);
+                if (!quizDetail) {
+                    quizDetail = new QuizDetail();
+                    quizDetail.question = question;
+                    quizDetail.quiz = quiz;
+                    await this.quizDetailService.saveQuizDetail(quizDetail);
+                }
+            }
+        }
+
         const type = await this.quizTypeService.getQuizTypeByField('id', body.type);
         const level = await this.examLevelService.getExamLevelByField('id', body.quizLevel);
+
+        quiz.type = type || quiz.type;
+        quiz.level = level || quiz.level;
+        quiz.subject = subject || quiz.subject;
+        quiz.name = body.name || quiz.name;
+        quiz.duration = body.duration > 0 ? body.duration : quiz.duration;
+        quiz.passRate = body.passRate > 0 ? body.passRate : quiz.passRate;
+        quiz.numberOfQuestion = body.numberOfQuestion;
+        quiz.isPublic = body.isPublic === null || body.isPublic === undefined ? quiz.isPublic : body.isPublic;
+
+        await this.quizService.saveQuiz(quiz);
+        return res.send(quiz);
+    }
+
+    @Delete('/:id')
+    @ApiParam({ name: 'id', example: 'TVgJIjsRFmIvyjUeBOLv4gOD3eQZY' })
+    async cDeleteQuiz(@Req() req: Request, @Res() res: Response, @Body() body: UpdateQuizDTO, @Param('id') id: string) {
+        const user = req.user;
+        const quiz = await this.quizService.getQuizByField('id', id);
+
+        if (!quiz) throw new HttpException({ quiz: ResponseMessage.NOT_FOUND }, StatusCodes.NOT_FOUND);
+
+        const attendedQuestion = await this.attendedQuestionService.getAttendedQuestionByQuizId(id);
+        if (attendedQuestion) throw new HttpException({ errorMessage: ResponseMessage.QUIZ_TAKEN }, StatusCodes.BAD_REQUEST);
+
+        if (user.role.description !== UserRole.ADMIN && quiz.subject.assignTo.id !== user.typeId) throw new HttpException({ errorMessage: ResponseMessage.FORBIDDEN }, StatusCodes.FORBIDDEN);
+
+        const quizDetails = await this.quizDetailService.getQuizDetailsByQuizId(quiz.id);
+        for (const item of quizDetails) {
+            await this.quizDetailService.deleteQuizDetail(item);
+        }
+        await this.quizService.deleteQuiz(quiz);
+
+        return res.send();
     }
 }
