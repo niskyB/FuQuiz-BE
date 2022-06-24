@@ -3,8 +3,8 @@ import { SaleService } from './../sale/sale.service';
 import { DataService } from './../core/providers/fake-data/data.service';
 import { CustomerService } from './../customer/customer.service';
 import { Customer, RegistrationStatus, User, UserRole } from './../core/models';
-import { Body, Controller, HttpException, Param, Post, Put, Req, Res, UseGuards, UsePipes } from '@nestjs/common';
-import { ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpException, Param, Post, Put, Req, Res, UseGuards, UsePipes } from '@nestjs/common';
+import { ApiBearerAuth, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { AuthService } from 'src/auth/auth.service';
@@ -18,6 +18,7 @@ import { CreateRegistrationDTO, UpdateRegistrationDTO, vCreateRegistrationDTO, v
 import { RegistrationService } from './registration.service';
 import { constant } from '../core';
 
+@ApiTags('registration')
 @Controller('registration')
 @ApiBearerAuth()
 export class RegistrationController {
@@ -30,6 +31,14 @@ export class RegistrationController {
         private readonly dataService: DataService,
         private readonly saleService: SaleService,
     ) {}
+
+    @Get('/:id')
+    @ApiParam({ name: 'id', example: 'TVgJIjsRFmIvyjUeBOLv4gOD3eQZY' })
+    async cGetRegistration(@Res() res: Response, @Param('id') id: string) {
+        const registration = await this.registrationService.getRegistrationByField('id', id);
+        if (!registration) throw new HttpException({ errorMessage: ResponseMessage.NOT_FOUND }, StatusCodes.NOT_FOUND);
+        return res.send(registration);
+    }
 
     @Post('')
     @UsePipes(new JoiValidatorPipe(vCreateRegistrationDTO))
@@ -59,10 +68,15 @@ export class RegistrationController {
                 customer = await this.customerService.getCustomerByUserId(user.id);
                 user.typeId = customer.id;
                 await this.userService.saveUser(user);
-            }
+            } else throw new HttpException({ email: ResponseMessage.EMAIL_TAKEN }, StatusCodes.BAD_REQUEST);
         }
 
-        const customer = await this.customerService.getCustomerByUserId(user.id);
+        let customer = await this.customerService.getCustomerByUserId(user.id);
+        if (!customer) {
+            customer = new Customer();
+            customer.user = user;
+            await this.customerService.saveCustomer(customer);
+        }
         const sale = await this.saleService.getSaleByUserId(body.sale);
 
         const registration = new Registration();
@@ -70,7 +84,7 @@ export class RegistrationController {
         registration.registrationTime = body.registrationTime;
         registration.status = body.status;
         registration.totalCost = pricePackage.salePrice;
-        registration.validForm = body.validFrom;
+        registration.validFrom = body.validFrom;
         registration.validTo = body.validTo;
         registration.pricePackage = pricePackage;
         registration.notes = body.note;
@@ -86,26 +100,33 @@ export class RegistrationController {
     }
 
     @Put('/:id')
-    @ApiParam({ name: 'userId', example: 'TVgJIjsRFmIvyjUeBOLv4gOD3eQZY' })
+    @ApiParam({ name: 'id', example: 'TVgJIjsRFmIvyjUeBOLv4gOD3eQZY' })
     @UseGuards(SaleGuard)
     @UsePipes(new JoiValidatorPipe(vUpdateRegistrationDTO))
     async cUpdateRegistration(@Req() req: Request, @Res() res: Response, @Body() body: UpdateRegistrationDTO, @Param('id') id: string) {
         const registration = await this.registrationService.getRegistrationByField('id', id);
 
+        if (
+            (registration.status === RegistrationStatus.PAID && body.status === RegistrationStatus.SUBMITTED) ||
+            (registration.status === RegistrationStatus.INACTIVE && (body.status === RegistrationStatus.PAID || body.status === RegistrationStatus.SUBMITTED))
+        )
+            throw new HttpException({ status: ResponseMessage.INVALID_STATUS }, StatusCodes.BAD_REQUEST);
+
         registration.status = body.status || registration.status;
+        registration.notes = body.note || registration.notes;
         if (body.status === RegistrationStatus.PAID) {
             const password = this.dataService.generateData(8, 'lettersAndNumbers');
             registration.customer.user.password = await this.authService.encryptPassword(password, constant.default.hashingSalt);
             registration.customer.user.isActive = true;
             await this.userService.saveUser(registration.customer.user);
             registration.customer.user.password = password;
-            const isSend = await this.authService.sendEmailToken(registration.customer.user, EmailAction.SEND_PASSWORD);
+            const isSend = await this.authService.sendEmailToken(registration.customer.user, EmailAction.SEND_PASSWORD, registration.customer.user.password);
             if (!isSend) {
                 throw new HttpException({ errorMessage: ResponseMessage.SOMETHING_WRONG }, StatusCodes.INTERNAL_SERVER_ERROR);
             }
         }
 
-        if (body.status !== RegistrationStatus.SUBMITTED || (registration.sale && registration.sale.id !== req.user.typeId)) {
+        if (body.status !== RegistrationStatus.SUBMITTED || (registration.sale && registration.sale.id !== req.user.typeId && req.user.role.description !== UserRole.ADMIN)) {
             await this.registrationService.saveRegistration(registration);
             return res.send();
         }
@@ -114,18 +135,19 @@ export class RegistrationController {
 
         registration.pricePackage = pricePackage || registration.pricePackage;
         registration.totalCost = registration.pricePackage.salePrice;
-        registration.validForm = body.validFrom || registration.validForm;
+        registration.validFrom = body.validFrom || registration.validFrom;
         registration.validTo = body.validTo || registration.validTo;
         registration.registrationTime = body.registrationTime || registration.registrationTime;
-        registration.notes = body.note || registration.notes;
         let user = await this.userService.findUser('email', body.email);
         let customer;
-        if (user) {
+        if (user && registration.customer.user.email === body.email) {
             user.fullName = body.fullName || user.fullName;
             user.gender = body.gender || user.gender;
             user.mobile = body.mobile || user.mobile;
             await this.userService.saveUser(user);
             customer = await this.customerService.getCustomerByUserId(user.id);
+        } else if (user) {
+            throw new HttpException({ email: ResponseMessage.EMAIL_TAKEN }, StatusCodes.BAD_REQUEST);
         } else {
             user = new User();
             customer = new Customer();
@@ -148,6 +170,6 @@ export class RegistrationController {
         registration.customer = customer;
         await this.registrationService.saveRegistration(registration);
 
-        return res.send();
+        return res.send(registration);
     }
 }
