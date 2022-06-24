@@ -87,8 +87,12 @@ export class RegistrationController {
         registration.validFrom = body.validFrom;
         registration.validTo = body.validTo;
         registration.pricePackage = pricePackage;
-        registration.notes = body.note;
-        if (sale) registration.sale = sale;
+        registration.notes = body.notes;
+        if (sale) {
+            registration.sale = sale;
+            registration.lastUpdatedBy = sale.user.fullName;
+        }
+        if (req.user && req.user.role.description === UserRole.ADMIN) registration.lastUpdatedBy = req.user.fullName;
 
         try {
             await this.registrationService.saveRegistration(registration);
@@ -113,8 +117,9 @@ export class RegistrationController {
             throw new HttpException({ status: ResponseMessage.INVALID_STATUS }, StatusCodes.BAD_REQUEST);
 
         registration.status = body.status || registration.status;
-        registration.notes = body.note || registration.notes;
-        if (body.status === RegistrationStatus.PAID) {
+        registration.notes = body.notes || registration.notes;
+        registration.lastUpdatedBy = req.user.fullName;
+        if (body.status === RegistrationStatus.PAID && registration.status !== RegistrationStatus.PAID) {
             const password = this.dataService.generateData(8, 'lettersAndNumbers');
             registration.customer.user.password = await this.authService.encryptPassword(password, constant.default.hashingSalt);
             registration.customer.user.isActive = true;
@@ -124,11 +129,15 @@ export class RegistrationController {
             if (!isSend) {
                 throw new HttpException({ errorMessage: ResponseMessage.SOMETHING_WRONG }, StatusCodes.INTERNAL_SERVER_ERROR);
             }
+            await this.registrationService.saveRegistration(registration);
         }
 
-        if (body.status !== RegistrationStatus.SUBMITTED || (registration.sale && registration.sale.id !== req.user.typeId && req.user.role.description !== UserRole.ADMIN)) {
-            await this.registrationService.saveRegistration(registration);
-            return res.send();
+        if (
+            body.status === RegistrationStatus.INACTIVE ||
+            (registration.sale && registration.sale.id !== req.user.typeId && req.user.role.description !== UserRole.ADMIN) ||
+            (body.status === RegistrationStatus.PAID && registration.status === RegistrationStatus.PAID)
+        ) {
+            throw new HttpException({ errorMessage: ResponseMessage.UNAUTHORIZED }, StatusCodes.UNAUTHORIZED);
         }
 
         const pricePackage = await this.pricePackageService.getPricePackageByField('id', body.pricePackage);
