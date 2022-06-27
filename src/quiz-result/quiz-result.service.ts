@@ -20,6 +20,7 @@ export class QuizResultService {
             .where(`quiz_result.${field.toString()} = (:value)`, { value })
             .leftJoinAndSelect('quiz_result.attendedQuestions', 'attendedQuestions')
             .leftJoinAndSelect('attendedQuestions.userAnswers', 'userAnswers')
+            .leftJoinAndSelect('userAnswers.answer', 'answer')
             .leftJoinAndSelect('attendedQuestions.questionInQuiz', 'questionInQuiz')
             .leftJoinAndSelect('questionInQuiz.question', 'question')
             .leftJoinAndSelect('questionInQuiz.quiz', 'quiz')
@@ -64,6 +65,11 @@ export class QuizResultService {
                 .leftJoinAndSelect('quiz_result.customer', 'customer')
                 .leftJoinAndSelect('customer.user', 'user')
                 .where('user.id = (:userId)', { userId })
+                .leftJoinAndSelect('quiz_result.attendedQuestions', 'attendedQuestions')
+                .leftJoinAndSelect('attendedQuestions.questionInQuiz', 'questionInQuiz')
+                .leftJoinAndSelect('questionInQuiz.quiz', 'quiz')
+                .leftJoinAndSelect('quiz.subject', 'subject')
+                .andWhere('subject.id LIKE (:subjectId)', { subjectId: `%${subject}%` })
                 .getCount();
         } catch (err) {
             console.log(err);
