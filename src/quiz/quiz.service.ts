@@ -53,7 +53,7 @@ export class QuizService {
         return { data: quizzes, count };
     }
 
-    async filterSimulationExams({ subject, name, currentPage, pageSize }): Promise<{ data: Quiz[]; count: number }> {
+    async filterSimulationExams(userId: string, subject: string, name: string, currentPage: number, pageSize: number): Promise<{ data: Quiz[]; count: number }> {
         let simulationExams, count;
         try {
             simulationExams = await this.quizRepository
