@@ -34,6 +34,8 @@ import { QuestionLevelModule } from './question-level/question-level.module';
 import { QuizTypeModule } from './quiz-type/quiz-type.module';
 import { ExamLevelModule } from './exam-level/exam-level.module';
 import { QuizDetailModule } from './quiz-detail/quiz-detail.module';
+import { RoleModule } from './role/role.module';
+import { SystemMenuModule } from './system-menu/system-menu.module';
 @Module({
     imports: [
         DbModule,
@@ -73,6 +75,8 @@ import { QuizDetailModule } from './quiz-detail/quiz-detail.module';
         QuizTypeModule,
         ExamLevelModule,
         QuizDetailModule,
+        RoleModule,
+        SystemMenuModule,
     ],
 })
 export class AppModule {}

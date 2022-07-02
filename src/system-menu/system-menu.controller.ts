@@ -6,35 +6,35 @@ import { Controller, Res, Get, Param, UseGuards, Put, UsePipes, Body, HttpExcept
 import { ApiTags, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { QuizTypeService } from './quiz-type.service';
+import { SystemMenuService } from './system-menu.service';
 
-@ApiTags('quiz-type')
+@ApiTags('system-menu')
 @ApiBearerAuth()
 @UseGuards(AdminGuard)
-@Controller('quiz-type')
-export class QuizTypeController {
-    constructor(private readonly quizTypeService: QuizTypeService) {}
+@Controller('system-menu')
+export class SystemMenuController {
+    constructor(private readonly systemMenuService: SystemMenuService) {}
 
     @Get('/:id')
     @ApiParam({ name: 'id', example: 'TVgJIjsRFmIvyjUeBOLv4gOD3eQZY' })
-    async cGetQuizTypeById(@Res() res: Response, @Param('id') id: string) {
-        const quizType = await this.quizTypeService.getQuizTypeByField('id', id);
-        return res.send(quizType);
+    async cGetSystemMenuById(@Res() res: Response, @Param('id') id: string) {
+        const systemMenu = await this.systemMenuService.getSystemMenuByField('id', id);
+        return res.send(systemMenu);
     }
 
     @Put('/isActive/:id')
     @ApiParam({ name: 'id', example: 'TVgJIjsRFmIvyjUeBOLv4gOD3eQZY' })
     @UsePipes(new JoiValidatorPipe(vUpdateSystemSettingStatusDTO))
-    async cUpdateQuizTypeStatus(@Res() res: Response, @Body() body: UpdateSystemSettingStatusDTO, @Param('id') id: string) {
-        const quizType = await this.quizTypeService.getQuizTypeByField('id', id);
-        quizType.isActive = body.isActive === null || body.isActive === undefined ? quizType.isActive : body.isActive;
+    async cUpdateSystemMenuStatus(@Res() res: Response, @Body() body: UpdateSystemSettingStatusDTO, @Param('id') id: string) {
+        const systemMenu = await this.systemMenuService.getSystemMenuByField('id', id);
+        systemMenu.isActive = body.isActive === null || body.isActive === undefined ? systemMenu.isActive : body.isActive;
 
         try {
-            await this.quizTypeService.saveQuizType(quizType);
+            await this.systemMenuService.saveSystemMenu(systemMenu);
         } catch (err) {
             throw new HttpException({ errorMessage: ResponseMessage.DUPLICATED_CATEGORY }, StatusCodes.BAD_REQUEST);
         }
 
-        return res.send(quizType);
+        return res.send(systemMenu);
     }
 }
