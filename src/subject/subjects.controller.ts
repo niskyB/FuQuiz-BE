@@ -1,4 +1,5 @@
-import { ExpertGuard } from './../auth/guard';
+import { DateService } from './../core/providers/date/date.service';
+import { ExpertGuard, MarketingGuard } from './../auth/guard';
 import { UserRole } from './../core/models';
 import { QueryJoiValidatorPipe } from './../core/pipe';
 import { FilterSubjectsDTO, vFilterSubjectsDTO } from './dto';
@@ -11,7 +12,7 @@ import { SubjectService } from './subject.service';
 @ApiBearerAuth()
 @Controller('subjects')
 export class SubjectsController {
-    constructor(private readonly subjectService: SubjectService) {}
+    constructor(private readonly subjectService: SubjectService, private readonly dateService: DateService) {}
 
     @Get('/role')
     @UseGuards(ExpertGuard)
@@ -29,6 +30,16 @@ export class SubjectsController {
             item.assignTo.user.token = '';
             return item;
         }, []);
+        return res.send(result);
+    }
+
+    @Get('/statistics')
+    @UseGuards(MarketingGuard)
+    @UsePipes()
+    async cGetSubjectsStatistics(@Res() res: Response) {
+        const days = this.dateService.calculateNDaysBack(7);
+        const result = await Promise.all(days.map(async (day) => await this.subjectService.getCountByDay(day)));
+
         return res.send(result);
     }
 

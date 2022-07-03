@@ -1,3 +1,4 @@
+import { DateService } from './../core/providers/date/date.service';
 import { CommonGuard, RegistrationGuard, SaleGuard } from './../auth/guard';
 import { EmailAction, ResponseMessage } from './../core/interface';
 import { SaleService } from './../sale/sale.service';
@@ -28,6 +29,7 @@ export class RegistrationController {
         private readonly customerService: CustomerService,
         private readonly dataService: DataService,
         private readonly saleService: SaleService,
+        private readonly dateService: DateService,
     ) {}
 
     @Get('/:id')
@@ -42,7 +44,7 @@ export class RegistrationController {
     @Post('')
     @UseGuards(RegistrationGuard)
     @UsePipes(new JoiValidatorPipe(vCreateRegistrationDTO))
-    async cCreateLesson(@Req() req: Request, @Res() res: Response, @Body() body: CreateRegistrationDTO) {
+    async cCreateRegistration(@Req() req: Request, @Res() res: Response, @Body() body: CreateRegistrationDTO) {
         const pricePackage = await this.pricePackageService.getPricePackageByField('id', body.pricePackage);
         if (!pricePackage) throw new HttpException({ errorMessage: ResponseMessage.INVALID_TYPE }, StatusCodes.BAD_REQUEST);
 
@@ -85,8 +87,6 @@ export class RegistrationController {
         registration.registrationTime = body.registrationTime;
         registration.status = body.status;
         registration.totalCost = pricePackage.salePrice;
-        registration.validFrom = body.validFrom;
-        registration.validTo = body.validTo;
         registration.pricePackage = pricePackage;
         registration.notes = body.notes;
         if (sale) {
@@ -114,7 +114,7 @@ export class RegistrationController {
         if (registration.status === RegistrationStatus.PAID || registration.status === RegistrationStatus.INACTIVE)
             throw new HttpException({ status: ResponseMessage.INVALID_STATUS }, StatusCodes.BAD_REQUEST);
 
-        if ((registration.status === RegistrationStatus.APPROVED || registration.status === RegistrationStatus.REJECTED) && body.status === RegistrationStatus.SUBMITTED)
+        if (registration.status === RegistrationStatus.APPROVED && body.status === RegistrationStatus.SUBMITTED)
             throw new HttpException({ status: ResponseMessage.INVALID_STATUS }, StatusCodes.BAD_REQUEST);
 
         if (body.status === RegistrationStatus.APPROVED && registration.status !== RegistrationStatus.APPROVED && !registration.customer.user.isActive) {
@@ -133,8 +133,6 @@ export class RegistrationController {
         registration.status = body.status || registration.status;
         registration.notes = body.notes || registration.notes;
         registration.lastUpdatedBy = req.user.fullName;
-        registration.validFrom = body.validFrom || registration.validFrom;
-        registration.validTo = body.validTo || registration.validTo;
 
         await this.registrationService.saveRegistration(registration);
         return res.send();
@@ -212,6 +210,8 @@ export class RegistrationController {
         customer.balance = customer.balance - registration.totalCost;
         await this.customerService.saveCustomer(customer);
 
+        registration.validFrom = new Date().toISOString();
+        registration.validTo = this.dateService.calculateValidTo(registration.validFrom, registration.pricePackage.duration);
         registration.status = RegistrationStatus.PAID;
         await this.registrationService.saveRegistration(registration);
         return res.send();
