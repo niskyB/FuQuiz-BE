@@ -33,6 +33,7 @@ import {
     UserAnswer,
     QuestionLevel,
     SystemMenu,
+    Transaction,
 } from './core/models';
 
 export const DbModule = TypeOrmModule.forRoot({
@@ -42,7 +43,7 @@ export const DbModule = TypeOrmModule.forRoot({
     username: config.DB_USERNAME,
     password: config.DB_PASSWORD,
     database: config.DB_NAME,
-    // synchronize: true,
+    synchronize: true,
     keepConnectionAlive: true,
     entities: [
         User,
@@ -79,6 +80,7 @@ export const DbModule = TypeOrmModule.forRoot({
         UserAnswer,
         QuestionLevel,
         SystemMenu,
+        Transaction,
     ],
     extra: { connectionLimit: 1 },
 });
