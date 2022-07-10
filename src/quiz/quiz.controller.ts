@@ -1,3 +1,4 @@
+import { RegistrationService } from './../registration/registration.service';
 import { DimensionService } from './../dimension/dimension.service';
 import { LessonService } from './../lesson/lesson.service';
 import { AnswerService } from './../answer/answer.service';
@@ -39,13 +40,15 @@ export class QuizController {
         private readonly answerService: AnswerService,
         private readonly lessonService: LessonService,
         private readonly dimensionService: DimensionService,
+        private readonly registrationService: RegistrationService,
     ) {}
 
     @Get('/:id')
     @UseGuards(CommonGuard)
     @ApiParam({ name: 'id', example: 'TVgJIjsRFmIvyjUeBOLv4gOD3eQZY' })
-    async cGetQuiz(@Res() res: Response, @Param('id') id: string) {
+    async cGetQuiz(@Req() req: Request, @Res() res: Response, @Param('id') id: string) {
         const quiz = await this.quizService.getQuizByField('id', id);
+        await this.registrationService.checkUserAccess(quiz.subject.id, req.user.email);
         quiz.questions = [];
         const quizDetail = await this.quizDetailService.getQuizDetailsByQuizId(id);
 
@@ -65,6 +68,7 @@ export class QuizController {
     @ApiParam({ name: 'id', example: 'TVgJIjsRFmIvyjUeBOLv4gOD3eQZY' })
     async cHandleQuiz(@Req() req: Request, @Res() res: Response, @Param('id') id: string) {
         const quiz = await this.quizService.getQuizByField('id', id);
+        await this.registrationService.checkUserAccess(quiz.subject.id, req.user.email);
         if (!quiz) throw new HttpException({ errorMessage: ResponseMessage.NOT_FOUND }, StatusCodes.NOT_FOUND);
 
         let quizResult = new QuizResult();
@@ -96,6 +100,7 @@ export class QuizController {
     @UsePipes(new JoiValidatorPipe(vSubmitQuizDTO))
     async cSubmitQuiz(@Res() res: Response, @Body() body: SubmitQuizDTO) {
         const quizResult = await this.quizResultService.getQuizResultByAttendedQuestionId(body.data[0].attendedQuestionId);
+        if (!quizResult) throw new HttpException({ errorMessage: ResponseMessage.NOT_FOUND }, StatusCodes.NOT_FOUND);
         let correctAnswers = 0;
 
         await Promise.all(
@@ -103,19 +108,19 @@ export class QuizController {
                 let attendedQuestion = await this.attendedQuestionService.getAttendedQuestionByField('id', item.attendedQuestionId);
                 attendedQuestion.isMarked = item.isMarked;
                 attendedQuestion = await this.attendedQuestionService.saveAttendedQuestion(attendedQuestion);
-                let isCorrect = 0;
-                const numberOfCorrectAnswer = await this.answerService.getNumberOfCorrectAnswer(attendedQuestion.questionInQuiz.question.id);
+                let isCorrect = true;
+
                 await Promise.all(
                     item.answerId.map(async (id) => {
                         const answer = await this.answerService.getAnswerByField('id', id);
                         const userAnswer = new UserAnswer();
                         userAnswer.attendedQuestion = attendedQuestion;
                         userAnswer.answer = answer;
-                        if (answer.isCorrect) isCorrect++;
+                        if (!answer.isCorrect) isCorrect = false;
                         await this.userAnswerService.saveUserAnswer(userAnswer);
                     }),
                 );
-                correctAnswers += isCorrect / numberOfCorrectAnswer;
+                if (isCorrect) correctAnswers++;
             }),
         );
 
@@ -134,6 +139,7 @@ export class QuizController {
     @UsePipes(new JoiValidatorPipe(vCreatePracticeQuizDTO))
     async cCreatePracticeQuiz(@Req() req: Request, @Res() res: Response, @Body() body: CreatePracticeQuizDTO) {
         const { subject: subjectId, subjectTopic: subjectTopicId, dimension: dimensionId } = body;
+        await this.registrationService.checkUserAccess(subjectId, req.user.email);
 
         const subject = await this.subjectService.getSubjectByField('id', subjectId);
         if (!subject) throw new HttpException({ subject: ResponseMessage.INVALID_SUBJECT }, StatusCodes.BAD_REQUEST);
