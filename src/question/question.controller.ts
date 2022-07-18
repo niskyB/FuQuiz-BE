@@ -138,7 +138,7 @@ export class QuestionController {
         newQuestion.videoLink = body.videoLink || question.videoLink;
         newQuestion.isMultipleChoice = body.isMultipleChoice;
         newQuestion.explanation = body.explanation;
-        newQuestion.isActive = body.isActive === null || body.isActive === undefined ? newQuestion.isActive : body.isActive;
+        newQuestion.isActive = body.isActive === null || body.isActive === undefined ? question.isActive : body.isActive;
         newQuestion.dimensions = question.dimensions;
         newQuestion.lesson = question.lesson;
 
@@ -192,10 +192,12 @@ export class QuestionController {
                         }
                     }),
                 );
-                const quizDetail = new QuizDetail();
-                quizDetail.question = newQuestion;
-                quizDetail.quiz = newQuiz;
-                await this.quizDetailService.saveQuizDetail(quizDetail);
+                if (newQuestion.isActive) {
+                    const quizDetail = new QuizDetail();
+                    quizDetail.question = newQuestion;
+                    quizDetail.quiz = newQuiz;
+                    await this.quizDetailService.saveQuizDetail(quizDetail);
+                }
                 item.isOld = true;
                 await this.quizService.saveQuiz(item);
             }),
