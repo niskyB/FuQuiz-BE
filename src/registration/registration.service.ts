@@ -82,6 +82,10 @@ export class RegistrationService {
             .createQueryBuilder('registration')
             .where('registration.status = (:status)', { status: RegistrationStatus.PAID })
             .andWhere('registration.validTo <= (:day)', { day })
+            .leftJoinAndSelect('registration.customer', 'customer')
+            .leftJoinAndSelect('customer.user', 'user')
+            .leftJoinAndSelect('registration.pricePackage', 'pricePackage')
+            .leftJoinAndSelect('pricePackage.subject', 'subject')
             .getMany();
     }
 

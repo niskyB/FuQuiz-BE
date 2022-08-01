@@ -24,7 +24,6 @@ import {
 } from './dto';
 import { RegistrationService } from './registration.service';
 import { constant } from '../core';
-import { Cron, CronExpression } from '@nestjs/schedule';
 
 @ApiTags('registration')
 @Controller('registration')
@@ -260,18 +259,5 @@ export class RegistrationController {
         registration.status = RegistrationStatus.CANCELLED;
         await this.registrationService.saveRegistration(registration);
         return res.send();
-    }
-
-    @Cron(CronExpression.EVERY_12_HOURS)
-    async cCheckValidRegistration() {
-        const today = new Date().toISOString();
-        const registrations = await this.registrationService.getPaidRegistrationByDay(today);
-
-        Promise.all(
-            registrations.map(async (item) => {
-                item.status = RegistrationStatus.INACTIVE;
-                await this.registrationService.saveRegistration(item);
-            }),
-        );
     }
 }
