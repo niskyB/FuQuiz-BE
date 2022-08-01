@@ -17,6 +17,7 @@ export class SubjectService {
             .leftJoinAndSelect('assignTo.user', 'user')
             .leftJoinAndSelect('subject.category', 'category')
             .leftJoinAndSelect('subject.lessons', 'lessons')
+            .andWhere('lessons.isActive = (:isActive)', { isActive: true })
             .leftJoinAndSelect('subject.pricePackages', 'pricePackages')
             .getOne();
     }
