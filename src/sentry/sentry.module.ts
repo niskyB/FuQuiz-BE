@@ -16,7 +16,7 @@ export class SentryModule {
         const options = {
             dsn: config.SENTRY_DSN,
             tracesSampleRate: 1.0,
-            debug: true,
+            // debug: true,
         };
         Sentry.init(options);
 

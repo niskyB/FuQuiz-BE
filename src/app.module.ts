@@ -38,7 +38,6 @@ import { RoleModule } from './role/role.module';
 import { SystemMenuModule } from './system-menu/system-menu.module';
 import { TransactionModule } from './transaction/transaction.module';
 import { ScheduleModule } from '@nestjs/schedule';
-
 import { SentryModule } from './sentry/sentry.module';
 import * as Sentry from '@sentry/node';
 import '@sentry/tracing';
