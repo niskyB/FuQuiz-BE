@@ -23,6 +23,7 @@ export class DateService {
         const fromDate = new Date(from);
         const toDate = new Date(to);
         result.push(fromDate.toISOString().slice(0, 10));
+
         while (fromDate.toISOString().slice(0, 10) !== toDate.toISOString().slice(0, 10)) {
             fromDate.setDate(fromDate.getDate() + 1);
             result.push(fromDate.toISOString().slice(0, 10));
