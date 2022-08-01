@@ -36,6 +36,8 @@ export class TransactionController {
 
     @Post('/callback')
     async cCallbackTransaction(@Res() res: Response, @Body() body: MomoCallbackDTO) {
+        if (body.resultCode != 0) return res.send();
+
         const transaction = await this.transactionService.findOneByField('id', body.orderId);
 
         if (transaction) {
