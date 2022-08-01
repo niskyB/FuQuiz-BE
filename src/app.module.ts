@@ -38,11 +38,11 @@ import { RoleModule } from './role/role.module';
 import { SystemMenuModule } from './system-menu/system-menu.module';
 import { TransactionModule } from './transaction/transaction.module';
 import { ScheduleModule } from '@nestjs/schedule';
-
 import { SentryModule } from './sentry/sentry.module';
 import * as Sentry from '@sentry/node';
 import '@sentry/tracing';
 import { RequestMethod, MiddlewareConsumer } from '@nestjs/common';
+import { CronJobModule } from './cron-job/cron-job.module';
 
 @Module({
     imports: [
@@ -89,6 +89,7 @@ import { RequestMethod, MiddlewareConsumer } from '@nestjs/common';
         ScheduleModule.forRoot(),
         SentryModule.forRoot(),
         SentryModule,
+        CronJobModule,
     ],
 })
 export class AppModule {
