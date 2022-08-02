@@ -27,7 +27,7 @@ export class QuizService {
             .getOne();
     }
 
-    async filterQuizzes({ name, subject, type }): Promise<{ data: Quiz[]; count: number }> {
+    async filterQuizzes({ name, subject, type, currentPage, pageSize }): Promise<{ data: Quiz[]; count: number }> {
         let quizzes, count;
         const query = this.quizRepository
             .createQueryBuilder('quiz')
@@ -39,7 +39,11 @@ export class QuizService {
             .andWhere('type.id LIKE (:typeId)', { typeId: `%${type}%` });
 
         try {
-            quizzes = await query.leftJoinAndSelect('quiz.level', 'level').getMany();
+            quizzes = await query
+                .leftJoinAndSelect('quiz.level', 'level')
+                .skip(currentPage * pageSize)
+                .take(pageSize)
+                .getMany();
             count = await query.getCount();
         } catch (err) {
             console.log(err);
